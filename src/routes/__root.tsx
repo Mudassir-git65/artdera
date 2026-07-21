@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -15,6 +16,8 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { AuthProvider } from "@/marketplace/auth";
 import { Toaster } from "@/components/ui/sonner";
+
+const safeImageFallbackScript = `document.addEventListener("error",function(event){var image=event.target;if(!(image instanceof HTMLImageElement))return;var fallback=image.dataset.fallbackSrc;if(!fallback||image.dataset.fallbackApplied==="true")return;image.dataset.fallbackApplied="true";var picture=image.parentElement;if(picture&&picture.tagName==="PICTURE")picture.querySelectorAll("source").forEach(function(source){source.remove()});image.removeAttribute("srcset");image.src=fallback},true);`;
 
 function NotFoundComponent() {
   return (
@@ -112,7 +115,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap",
       },
     ],
   }),
@@ -127,9 +130,11 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: safeImageFallbackScript }} />
       </head>
       <body>
         {children}
+        <SpeedInsights />
         <Scripts />
       </body>
     </html>

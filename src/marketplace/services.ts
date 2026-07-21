@@ -12,6 +12,7 @@ import {
   IMAGES,
   PRODUCTS,
   hydrateEditorialData,
+  normalizeEditorialImage,
   type Category as EditorialCategory,
   type Creator as EditorialCreator,
   type EditorialCollection,
@@ -283,7 +284,7 @@ function hydratePublicCatalog(data: Record<string, any>) {
   const artworks = (data.artworks ?? []) as Artwork[];
   const creatorsRaw = (data.creators ?? []) as Array<Record<string, any>>;
   const galleriesRaw = (data.galleries ?? []) as Array<Record<string, any>>;
-  const creators: EditorialCreator[] = [...creatorsRaw, ...galleriesRaw].map((creator) => ({
+  const creators: EditorialCreator[] = [...creatorsRaw, ...galleriesRaw].map((creator, index) => ({
     slug: creator.slug ?? slugify(creator.name),
     name: creator.name,
     handle: creator.handle ?? `@${slugify(creator.name)}`,
@@ -291,7 +292,7 @@ function hydratePublicCatalog(data: Record<string, any>) {
     discipline: creator.title ?? creator.type ?? "Visual art",
     bio: creator.bio ?? "",
     verified: Boolean(creator.verified),
-    portrait: creator.portrait || IMAGES.creator1,
+    portrait: normalizeEditorialImage(creator.portrait, index, "creator"),
     works: artworks
       .filter(
         (artwork) =>
@@ -300,7 +301,7 @@ function hydratePublicCatalog(data: Record<string, any>) {
       )
       .map((artwork) => artwork.slug),
   }));
-  const products: Product[] = artworks.map((artwork) => {
+  const products: Product[] = artworks.map((artwork, index) => {
     const store = stores.find((item) => item.id === artwork.storeId);
     const creator = creators.find((item) => item.works.includes(artwork.slug));
     return {
@@ -323,7 +324,7 @@ function hydratePublicCatalog(data: Record<string, any>) {
       colours: [],
       room: [],
       description: artwork.description,
-      images: artwork.images.map((image) => image.url),
+      images: [normalizeEditorialImage(artwork.images[0]?.url, index)],
       featured: artwork.sponsored,
       new: true,
     };
@@ -338,7 +339,7 @@ function hydratePublicCatalog(data: Record<string, any>) {
       blurb: `Browse ${category.name.toLowerCase()} available from ArtDera sellers.`,
       image:
         products.find((product) => product.categorySlug === category.slug)?.images[0] ??
-        Object.values(IMAGES)[index % 6],
+        normalizeEditorialImage(undefined, index),
     }),
   );
   const collections: EditorialCollection[] = (data.collections ?? []).map(

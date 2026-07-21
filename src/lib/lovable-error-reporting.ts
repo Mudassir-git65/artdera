@@ -34,3 +34,28 @@ export function reportLovableError(error: unknown, context: Record<string, unkno
     },
   );
 }
+
+const reportedImageErrors = new Set<string>();
+
+export function reportImageError(source: string, section: string) {
+  if (typeof window === "undefined") return;
+  let safeSource = source;
+  try {
+    const url = new URL(source, window.location.origin);
+    safeSource = `${url.origin === window.location.origin ? "" : url.origin}${url.pathname}`;
+  } catch {
+    safeSource = source.split(/[?#]/, 1)[0];
+  }
+  const key = `${section}:${safeSource}`;
+  if (reportedImageErrors.has(key)) return;
+  reportedImageErrors.add(key);
+  if (import.meta.env.DEV) {
+    console.warn(`[ArtDera image] ${section}: ${safeSource}`);
+    return;
+  }
+  window.__lovableEvents?.captureException?.(
+    new Error("A public image failed to load"),
+    { source: "safe_image", route: window.location.pathname, section, image: safeSource },
+    { mechanism: "manual", handled: true, severity: "warning" },
+  );
+}

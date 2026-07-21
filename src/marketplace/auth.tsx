@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AuthService, MarketplaceService } from "./services";
 import type { User } from "./types";
 
 type AuthContextValue = {
@@ -11,30 +10,45 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+async function loadSession() {
+  const response = await fetch("/api/auth/session", { credentials: "include" });
+  if (!response.ok) return null;
+  const body = (await response.json()) as { success?: boolean; data?: { user?: User | null } };
+  return body.success ? (body.data?.user ?? null) : null;
+}
+
+async function initializeAuthenticatedUser(user: User | null) {
+  if (!user) return null;
+  const { MarketplaceService } = await import("./services");
+  return MarketplaceService.initialize();
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
+
   const refresh = async () => {
-    const next = await AuthService.currentUser();
-    setUser(next);
+    setReady(false);
+    const sessionUser = await loadSession();
+    setUser(sessionUser);
+    setUser(await initializeAuthenticatedUser(sessionUser));
+    setReady(true);
   };
 
   useEffect(() => {
     let active = true;
-    MarketplaceService.initialize()
-      .then((next) => {
+    loadSession()
+      .then(async (sessionUser) => {
         if (!active) return;
-        setUser(next);
+        setUser(sessionUser);
+        const initializedUser = await initializeAuthenticatedUser(sessionUser);
+        if (!active) return;
+        setUser(initializedUser);
         setReady(true);
       })
-      .catch((initializationError: unknown) => {
+      .catch((error: unknown) => {
         if (!active) return;
-        setError(
-          initializationError instanceof Error
-            ? initializationError.message
-            : "ArtDera could not connect to its secure data service.",
-        );
+        if (import.meta.env.DEV) console.warn("ArtDera session initialization failed", error);
         setReady(true);
       });
     return () => {
@@ -49,35 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh,
       logout: async () => {
         setUser(null);
-        await AuthService.logout();
+        await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
       },
     }),
     [ready, user],
   );
-
-  if (!ready)
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ivory)] px-5">
-        <div className="text-center">
-          <div className="eyebrow">ArtDera</div>
-          <div className="mt-4 h-1 w-40 animate-pulse rounded-full bg-[var(--oxblood)]/30" />
-          <p className="mt-4 text-sm text-muted-foreground">Loading the marketplace…</p>
-        </div>
-      </div>
-    );
-  if (error)
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--ivory)] px-5">
-        <div className="max-w-lg rounded-2xl border border-[var(--color-border)] bg-[var(--porcelain)] p-8 text-center">
-          <div className="eyebrow">Secure service unavailable</div>
-          <h1 className="mt-3 font-display text-4xl">ArtDera is not ready yet.</h1>
-          <p className="mt-3 text-sm text-muted-foreground">{error}</p>
-          <button onClick={() => window.location.reload()} className="btn-primary mt-6">
-            Try again
-          </button>
-        </div>
-      </div>
-    );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

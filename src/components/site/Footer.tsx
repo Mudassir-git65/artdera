@@ -1,7 +1,7 @@
 import { Facebook, Instagram, Linkedin, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "./Logo";
-import { NewsletterService } from "@/marketplace/services";
+import { subscribeToNewsletter } from "@/lib/homepage-data";
 
 const COLS = [
   {
@@ -113,10 +113,13 @@ export function Footer() {
                   event.preventDefault();
                   const form = event.currentTarget;
                   const email = String(new FormData(form).get("email") ?? "");
-                  const result = await NewsletterService.subscribe(email, "footer");
-                  if (result.error) return toast.error(result.error.message);
-                  form.reset();
-                  toast.success("Newsletter preference saved");
+                  try {
+                    await subscribeToNewsletter(email, "footer");
+                    form.reset();
+                    toast.success("Newsletter preference saved");
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Please try again");
+                  }
                 })()
               }
             >

@@ -2,7 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { Eye, Heart, ShieldCheck, ShoppingBag, Sparkles } from "lucide-react";
 import { useState } from "react";
 import type { Product } from "@/lib/artdera";
-import { CREATORS, formatPKR } from "@/lib/artdera";
+import { CREATORS, formatPKR, IMAGE_FALLBACKS } from "@/lib/artdera";
+import { buildImageSources, SafeImage } from "@/components/site/SafeImage";
 import {
   Dialog,
   DialogContent,
@@ -25,18 +26,29 @@ export function ProductCard({ product }: { product: Product }) {
           params={{ slug: product.slug }}
           aria-label={`View ${product.title}`}
         >
-          <img
+          <SafeImage
             src={product.images[0]}
             alt={product.title}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.035]"
+            width={720}
+            height={900}
+            sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+            sources={buildImageSources(product.images[0], [320, 480, 720])}
+            fallbackSrc={IMAGE_FALLBACKS.artwork}
+            section="product-card"
+            containerClassName="absolute inset-0 h-full w-full"
+            className="transition-transform duration-700 group-hover:scale-[1.035]"
           />
           {secondaryImage !== product.images[0] && (
-            <img
+            <SafeImage
               src={secondaryImage}
               alt=""
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover opacity-0 transition duration-700 group-hover:opacity-100"
+              width={720}
+              height={900}
+              sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
+              sources={buildImageSources(secondaryImage, [320, 480, 720])}
+              fallbackSrc={IMAGE_FALLBACKS.artwork}
+              section="product-card-secondary"
+              containerClassName="absolute inset-0 h-full w-full opacity-0 transition duration-700 group-hover:opacity-100"
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
@@ -143,10 +155,16 @@ function ProductQuickView({ product }: { product: Product }) {
       <DialogContent className="max-h-[calc(100vh-3rem)] max-w-4xl overflow-y-auto rounded-2xl bg-[var(--porcelain)] p-0 sm:rounded-2xl">
         <div className="grid md:grid-cols-[0.95fr_1fr]">
           <div className="relative min-h-[320px] bg-secondary">
-            <img
+            <SafeImage
               src={product.images[0]}
               alt={product.title}
-              className="absolute inset-0 h-full w-full object-cover"
+              width={720}
+              height={900}
+              sizes="(min-width: 768px) 48vw, 100vw"
+              sources={buildImageSources(product.images[0], [320, 480, 720])}
+              fallbackSrc={IMAGE_FALLBACKS.artwork}
+              section="product-quick-view"
+              containerClassName="absolute inset-0 h-full w-full"
             />
           </div>
           <div className="p-6 md:p-8">

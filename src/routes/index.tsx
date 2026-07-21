@@ -12,18 +12,20 @@ import {
   Truck,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
-  CATEGORIES,
   COLLECTIONS,
   CREATORS,
+  HOMEPAGE_CATEGORIES,
+  IMAGE_FALLBACKS,
   PRODUCTS,
   formatPKR,
   getProduct,
   IMAGES,
 } from "@/lib/artdera";
 import { ProductCard } from "@/components/site/ProductCard";
-import { NewsletterService } from "@/marketplace/services";
+import { buildImageSources, SafeImage, type SafeImageSource } from "@/components/site/SafeImage";
+import { refreshHomepageCatalog, subscribeToNewsletter } from "@/lib/homepage-data";
 import { toast } from "sonner";
 // import { ArtDeraScrollStory } from "@/components/site/scroll-story/ArtDeraScrollStory";
 
@@ -34,6 +36,52 @@ const WALL_QUIZ_BUDGET_MAX: Record<string, number> = {
   "PKR 50,000-100,000": 100000,
   "Collector pieces": 300000,
 };
+
+const WALL_QUIZ_OPTIONS = {
+  room: ["Living room", "Bedroom", "Office", "Dining room", "Restaurant", "Hotel", "Other"],
+  mood: ["Calm", "Bold", "Minimal", "Cultural", "Luxurious", "Expressive"],
+  colour: ["terracotta", "indigo", "ivory", "oxblood", "ink", "stone"],
+  size: ["Small", "Medium", "Large", "Statement"],
+  budget: Object.keys(WALL_QUIZ_BUDGET_MAX),
+} as const;
+
+const MOOD_COLOURS: Record<string, string[]> = {
+  Calm: ["ivory", "indigo", "stone"],
+  Bold: ["oxblood", "terracotta", "indigo"],
+  Minimal: ["ink", "ivory", "stone"],
+  Cultural: ["terracotta", "oxblood", "indigo"],
+  Luxurious: ["oxblood", "ink", "stone"],
+  Expressive: ["terracotta", "indigo", "oxblood"],
+};
+
+const HERO_SOURCES: SafeImageSource[] = [
+  {
+    type: "image/avif",
+    media: "(max-width: 639px)",
+    srcSet:
+      "/images/hero/artdera-hero-mobile-480.avif 480w, /images/hero/artdera-hero-mobile-768.avif 768w",
+    sizes: "100vw",
+  },
+  {
+    type: "image/webp",
+    media: "(max-width: 639px)",
+    srcSet:
+      "/images/hero/artdera-hero-mobile-480.webp 480w, /images/hero/artdera-hero-mobile-768.webp 768w",
+    sizes: "100vw",
+  },
+  {
+    type: "image/avif",
+    srcSet:
+      "/images/hero/artdera-hero-768.avif 768w, /images/hero/artdera-hero-1200.avif 1200w, /images/hero/artdera-hero-1600.avif 1600w",
+    sizes: "100vw",
+  },
+  {
+    type: "image/webp",
+    srcSet:
+      "/images/hero/artdera-hero-768.webp 768w, /images/hero/artdera-hero-1200.webp 1200w, /images/hero/artdera-hero-1600.webp 1600w",
+    sizes: "100vw",
+  },
+];
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -53,13 +101,23 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const [, setCatalogVersion] = useState(0);
+  useEffect(() => {
+    let active = true;
+    void refreshHomepageCatalog().then((updated) => {
+      if (active && updated) setCatalogVersion((version) => version + 1);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
   const featured = PRODUCTS.filter((p) => p.featured);
   const editPicks = COLLECTIONS[0].products
     .map((s) => PRODUCTS.find((p) => p.slug === s)!)
     .filter(Boolean);
-  const affordable = PRODUCTS.filter((p) => p.price < 50000);
+  const affordablePicks = PRODUCTS.filter((p) => p.price < 50000);
+  const affordable = affordablePicks.length ? affordablePicks : PRODUCTS.slice(0, 6);
   const collector = PRODUCTS.find((p) => p.kind === "Original") ?? PRODUCTS[0];
-  const storyProduct = getProduct("quiet-horizon") ?? collector;
 
   return (
     <div>
@@ -91,48 +149,21 @@ function Home() {
 }
 
 function CinematicHero() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (reduceMotion.matches) {
-      video.pause();
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          void video.play().catch(() => undefined);
-        } else {
-          video.pause();
-        }
-      },
-      { threshold: 0.18 },
-    );
-
-    observer.observe(video);
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <section className="relative min-h-[100svh] overflow-hidden bg-[var(--ink)] text-white">
-      <video
-        ref={videoRef}
-        aria-hidden="true"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        poster={IMAGES.heroInterior}
-        className="absolute inset-0 h-full w-full object-cover object-center"
-      >
-        <source src="/hero.mp4" type="video/mp4" />
-      </video>
+      <SafeImage
+        src={IMAGES.heroInterior}
+        sources={HERO_SOURCES}
+        alt="Curated original artwork displayed in a contemporary interior"
+        width={1600}
+        height={1200}
+        sizes="100vw"
+        priority
+        fallbackSrc={IMAGE_FALLBACKS.interior}
+        section="homepage-hero"
+        containerClassName="absolute inset-0 h-full w-full"
+        className="object-center"
+      />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(23,23,23,0.82)_0%,rgba(23,23,23,0.52)_38%,rgba(23,23,23,0.16)_72%),linear-gradient(0deg,rgba(23,23,23,0.78)_0%,transparent_36%,rgba(23,23,23,0.24)_100%)]" />
       <div className="relative z-10 flex min-h-[100svh] items-end">
         <div className="container-editorial pb-24 pt-36 md:pb-28">
@@ -226,18 +257,31 @@ function CategoryMosaic() {
         subtitle="An editorial gateway to originals, editions, calligraphy, photography, wall decor and commissions."
         cta={["View all", "/discover"]}
       />
-      <div className="mt-10 grid auto-rows-[220px] grid-cols-1 gap-4 md:grid-cols-4 md:auto-rows-[250px]">
-        {CATEGORIES.map((category, index) => (
+      <div className="mt-10 grid auto-rows-[230px] grid-cols-1 gap-4 min-[380px]:grid-cols-2 md:grid-cols-4 md:auto-rows-[250px]">
+        {HOMEPAGE_CATEGORIES.map((category, index) => (
           <a
             key={category.slug}
             href={`/discover?category=${category.slug}`}
             className={`group relative overflow-hidden rounded-xl ${classes[index]}`}
           >
-            <img
+            <SafeImage
               src={category.image}
-              alt={category.name}
-              className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.05]"
-              loading={index > 1 ? "lazy" : undefined}
+              alt={category.imageAlt ?? category.name}
+              width={768}
+              height={960}
+              sizes="(min-width: 1280px) 24vw, (min-width: 768px) 33vw, (min-width: 380px) 50vw, 100vw"
+              sources={buildImageSources(
+                category.image,
+                category.slug === "custom-commissions"
+                  ? [480, 768, 1200]
+                  : category.image.includes("/categories/")
+                    ? [480, 768]
+                    : [320, 480, 720],
+              )}
+              fallbackSrc={IMAGE_FALLBACKS.gallery}
+              section={`homepage-category-${category.slug}`}
+              containerClassName="h-full w-full"
+              className="transition duration-700 group-hover:scale-[1.05]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/18 to-transparent transition group-hover:from-black/84" />
             <div className="absolute inset-x-0 bottom-0 p-5 text-white">
@@ -276,10 +320,17 @@ function ArtDeraEdit({ products }: { products: typeof PRODUCTS }) {
             params={{ slug: dominant.slug }}
             className="group relative min-h-[520px] overflow-hidden rounded-xl bg-[var(--ink)] text-white"
           >
-            <img
+            <SafeImage
               src={dominant.images[0]}
               alt={dominant.title}
-              className="absolute inset-0 h-full w-full object-cover opacity-88 transition duration-700 group-hover:scale-[1.025]"
+              width={720}
+              height={900}
+              sizes="(min-width: 1024px) 58vw, 100vw"
+              sources={buildImageSources(dominant.images[0], [320, 480, 720])}
+              fallbackSrc={IMAGE_FALLBACKS.artwork}
+              section="homepage-artdera-edit-dominant"
+              containerClassName="absolute inset-0 h-full w-full"
+              className="opacity-88 transition duration-700 group-hover:scale-[1.025]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/82 via-black/18 to-transparent" />
             <div className="absolute bottom-0 max-w-lg p-6 md:p-8">
@@ -299,11 +350,17 @@ function ArtDeraEdit({ products }: { products: typeof PRODUCTS }) {
                 params={{ slug: product.slug }}
                 className="group grid grid-cols-[120px_1fr] gap-4 rounded-xl border border-[var(--color-border)] bg-white/55 p-3 transition hover:border-[var(--oxblood)]"
               >
-                <img
+                <SafeImage
                   src={product.images[0]}
                   alt={product.title}
-                  className="h-36 w-full rounded-lg object-cover transition group-hover:scale-[1.02]"
-                  loading="lazy"
+                  width={320}
+                  height={400}
+                  sizes="120px"
+                  sources={buildImageSources(product.images[0], [320, 480])}
+                  fallbackSrc={IMAGE_FALLBACKS.artwork}
+                  section="homepage-artdera-edit-supporting"
+                  containerClassName="h-36 w-full rounded-lg"
+                  className="transition group-hover:scale-[1.02]"
                 />
                 <span className="py-2">
                   <span className="eyebrow">Museum caption</span>
@@ -335,18 +392,40 @@ function CurateWallQuiz() {
 
   const recommendation = useMemo(() => {
     const max = WALL_QUIZ_BUDGET_MAX[answers.budget] ?? 300000;
-    return (
-      PRODUCTS.find(
-        (product) =>
-          product.price <= max &&
-          product.room.some((room) =>
-            room.toLowerCase().includes(answers.room.toLowerCase().split(" ")[0]),
-          ) &&
-          product.colours.includes(answers.colour),
-      ) ??
-      PRODUCTS.find((product) => product.price <= max) ??
-      PRODUCTS[0]
-    );
+    const eligible = PRODUCTS.filter((product) => product.price <= max);
+    const pool = eligible.length ? eligible : PRODUCTS;
+    const selectedSize = answers.size;
+    const moodColours = MOOD_COLOURS[answers.mood] ?? [];
+    const answerSeed = Object.values(answers)
+      .join("|")
+      .split("")
+      .reduce((total, character) => total + character.charCodeAt(0), 0);
+    return [...pool].sort((left, right) => {
+      const score = (product: (typeof PRODUCTS)[number]) => {
+        const roomMatch = product.room.some((room) =>
+          room.toLowerCase().includes(answers.room.toLowerCase().split(" ")[0]),
+        );
+        const longestSide = Math.max(
+          ...(product.dimensions.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [0]),
+        );
+        const sizeMatch =
+          (selectedSize === "Small" && longestSide <= 50) ||
+          (selectedSize === "Medium" && longestSide > 50 && longestSide <= 80) ||
+          (selectedSize === "Large" && longestSide > 80 && longestSide <= 110) ||
+          (selectedSize === "Statement" && longestSide > 110);
+        return (
+          (roomMatch ? 4 : 0) +
+          (product.colours.includes(answers.colour) ? 5 : 0) +
+          (product.colours.some((colour) => moodColours.includes(colour)) ? 2 : 0) +
+          (sizeMatch ? 3 : 0)
+        );
+      };
+      const scoreDifference = score(right) - score(left);
+      if (scoreDifference) return scoreDifference;
+      const leftTieBreak = (answerSeed + left.slug.length * 17) % 97;
+      const rightTieBreak = (answerSeed + right.slug.length * 17) % 97;
+      return rightTieBreak - leftTieBreak;
+    })[0];
   }, [answers]);
 
   const params = new URLSearchParams({
@@ -374,49 +453,48 @@ function CurateWallQuiz() {
             field="room"
             answers={answers}
             setAnswers={setAnswers}
-            options={[
-              "Living room",
-              "Bedroom",
-              "Office",
-              "Dining room",
-              "Restaurant",
-              "Hotel",
-              "Other",
-            ]}
+            options={[...WALL_QUIZ_OPTIONS.room]}
           />
           <QuizGroup
             title="What mood do you prefer?"
             field="mood"
             answers={answers}
             setAnswers={setAnswers}
-            options={["Calm", "Bold", "Minimal", "Cultural", "Luxurious", "Expressive"]}
+            options={[...WALL_QUIZ_OPTIONS.mood]}
           />
           <QuizGroup
             title="Which colours do you want?"
             field="colour"
             answers={answers}
             setAnswers={setAnswers}
-            options={["terracotta", "indigo", "ivory", "oxblood", "ink", "stone"]}
+            options={[...WALL_QUIZ_OPTIONS.colour]}
           />
           <QuizGroup
             title="What size are you looking for?"
             field="size"
             answers={answers}
             setAnswers={setAnswers}
-            options={["Small", "Medium", "Large", "Statement"]}
+            options={[...WALL_QUIZ_OPTIONS.size]}
           />
           <QuizGroup
             title="What is your budget?"
             field="budget"
             answers={answers}
             setAnswers={setAnswers}
-            options={Object.keys(WALL_QUIZ_BUDGET_MAX)}
+            options={[...WALL_QUIZ_OPTIONS.budget]}
           />
           <div className="mt-7 grid gap-4 rounded-xl bg-[var(--ivory)] p-4 md:grid-cols-[100px_1fr_auto] md:items-center">
-            <img
+            <SafeImage
               src={recommendation.images[0]}
               alt={recommendation.title}
-              className="h-28 w-24 rounded-lg object-cover"
+              width={320}
+              height={400}
+              sizes="96px"
+              sources={buildImageSources(recommendation.images[0], [320, 480])}
+              fallbackSrc={IMAGE_FALLBACKS.artwork}
+              section="homepage-curate-wall"
+              showSkeleton
+              containerClassName="h-28 w-24 rounded-lg"
             />
             <div>
               <div className="eyebrow">Suggested starting point</div>
@@ -469,35 +547,41 @@ function QuizGroup({
 }
 
 function ShopThisSpace() {
-  const hotProducts = ["quiet-horizon", "silence-in-script", "pomegranate-study"]
+  const preferredProducts = ["quiet-horizon", "silence-in-script", "pomegranate-study"]
     .map((slug) => getProduct(slug))
     .filter(Boolean) as typeof PRODUCTS;
+  const hotProducts = preferredProducts.length === 3 ? preferredProducts : PRODUCTS.slice(0, 3);
   const [activeSlug, setActiveSlug] = useState(hotProducts[0]?.slug);
   const active = hotProducts.find((product) => product.slug === activeSlug) ?? hotProducts[0];
   const positions = [
-    { slug: "quiet-horizon", x: "48%", y: "34%" },
-    { slug: "silence-in-script", x: "25%", y: "43%" },
-    { slug: "pomegranate-study", x: "71%", y: "58%" },
-  ];
+    { slug: hotProducts[0]?.slug, x: "48%", y: "34%" },
+    { slug: hotProducts[1]?.slug, x: "25%", y: "43%" },
+    { slug: hotProducts[2]?.slug, x: "71%", y: "58%" },
+  ].filter((spot): spot is { slug: string; x: string; y: string } => Boolean(spot.slug));
 
   if (!active) return null;
 
   return (
     <section id="shop-this-space" className="bg-[var(--ink)] text-[var(--ivory)]">
       <div className="container-editorial section-y">
-        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div>
+        <div className="grid min-w-0 gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div className="min-w-0">
             <div className="eyebrow text-white/55">Interior discovery</div>
             <h2 className="mt-3 font-display text-4xl md:text-5xl">Shop This Space</h2>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/68">
               See how scale, colour and negative space can turn a room into a collection.
             </p>
             <div className="relative mt-8 overflow-hidden rounded-xl">
-              <img
-                src={IMAGES.heroInterior}
+              <SafeImage
+                src={IMAGES.shopInterior}
                 alt="Sophisticated living room with art and decor"
-                className="h-full min-h-[460px] w-full object-cover"
-                loading="lazy"
+                width={1600}
+                height={1200}
+                sizes="(min-width: 1024px) 55vw, 100vw"
+                sources={buildImageSources(IMAGES.shopInterior, [480, 768, 1200, 1600])}
+                fallbackSrc={IMAGE_FALLBACKS.interior}
+                section="homepage-shop-this-space"
+                containerClassName="aspect-[4/3] min-h-[360px] w-full md:min-h-[460px]"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
               {positions.map((spot, index) => (
@@ -515,12 +599,18 @@ function ShopThisSpace() {
               ))}
             </div>
           </div>
-          <div className="rounded-2xl border border-white/12 bg-white/[0.06] p-5">
-            <img
+          <div className="min-w-0 rounded-2xl border border-white/12 bg-white/[0.06] p-5">
+            <SafeImage
               src={active.images[0]}
               alt={active.title}
-              className="aspect-[4/5] w-full rounded-xl object-cover"
-              loading="lazy"
+              width={720}
+              height={900}
+              sizes="(min-width: 1024px) 36vw, 100vw"
+              sources={buildImageSources(active.images[0], [320, 480, 720])}
+              fallbackSrc={IMAGE_FALLBACKS.artwork}
+              section="homepage-shop-this-space-selected"
+              showSkeleton
+              containerClassName="aspect-[4/5] w-full rounded-xl"
             />
             <div className="mt-5">
               <div className="eyebrow text-white/50">Selected piece</div>
@@ -556,17 +646,28 @@ function ShopThisSpace() {
 
 function CreatorSpotlight() {
   const creator = CREATORS[0];
-  const works = creator.works.map((slug) => getProduct(slug)).filter(Boolean) as typeof PRODUCTS;
+  const creatorWorks = creator.works
+    .map((slug) => getProduct(slug))
+    .filter(Boolean) as typeof PRODUCTS;
+  const works = [
+    ...creatorWorks,
+    ...PRODUCTS.filter((product) => !creatorWorks.some((work) => work.slug === product.slug)),
+  ].slice(0, 3);
 
   return (
     <section className="container-editorial section-y">
       <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
         <div className="relative overflow-hidden rounded-xl">
-          <img
+          <SafeImage
             src={creator.portrait}
-            alt={creator.name}
-            className="aspect-[4/5] w-full object-cover"
-            loading="lazy"
+            alt={`Portrait of ${creator.name}`}
+            width={720}
+            height={900}
+            sizes="(min-width: 1024px) 42vw, 100vw"
+            sources={buildImageSources(creator.portrait, [320, 480, 720])}
+            fallbackSrc={IMAGE_FALLBACKS.artist}
+            section="homepage-creator-portrait"
+            containerClassName="aspect-[4/5] w-full"
           />
         </div>
         <div>
@@ -589,11 +690,17 @@ function CreatorSpotlight() {
                 params={{ slug: work.slug }}
                 className="group block"
               >
-                <img
+                <SafeImage
                   src={work.images[0]}
                   alt={work.title}
-                  className="aspect-square rounded-lg object-cover transition group-hover:scale-[1.03]"
-                  loading="lazy"
+                  width={480}
+                  height={480}
+                  sizes="(min-width: 1024px) 12vw, 30vw"
+                  sources={buildImageSources(work.images[0], [320, 480])}
+                  fallbackSrc={IMAGE_FALLBACKS.artwork}
+                  section="homepage-creator-work"
+                  containerClassName="aspect-square rounded-lg"
+                  className="transition group-hover:scale-[1.03]"
                 />
               </Link>
             ))}
@@ -615,17 +722,28 @@ function CollectorSpotlight({ product }: { product: (typeof PRODUCTS)[number] })
       <div className="container-editorial section-y">
         <div className="grid gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
           <div className="grid grid-cols-[1fr_0.42fr] gap-4">
-            <img
+            <SafeImage
               src={product.images[0]}
               alt={product.title}
-              className="min-h-[520px] rounded-xl object-cover"
-              loading="lazy"
+              width={720}
+              height={900}
+              sizes="(min-width: 1024px) 45vw, 70vw"
+              sources={buildImageSources(product.images[0], [320, 480, 720])}
+              fallbackSrc={IMAGE_FALLBACKS.artwork}
+              section="homepage-collector-primary"
+              containerClassName="min-h-[420px] rounded-xl lg:min-h-[520px]"
             />
-            <img
+            <SafeImage
               src={product.images[0]}
               alt=""
-              className="h-72 rounded-xl object-cover object-left lg:h-full"
-              loading="lazy"
+              width={480}
+              height={900}
+              sizes="(min-width: 1024px) 18vw, 30vw"
+              sources={buildImageSources(product.images[0], [320, 480])}
+              fallbackSrc={IMAGE_FALLBACKS.artwork}
+              section="homepage-collector-detail"
+              containerClassName="h-72 rounded-xl lg:h-full"
+              className="object-left"
             />
           </div>
           <div>
@@ -762,6 +880,17 @@ function CommissionPreview() {
           <a href={`/discover?category=custom-commissions&q=${query}`} className="btn-primary mt-7">
             Start a Commission
           </a>
+          <SafeImage
+            src={IMAGES.customCommission}
+            alt="Artist developing a commissioned artwork from studio sketches"
+            width={1200}
+            height={1500}
+            sizes="(min-width: 1024px) 38vw, 100vw"
+            sources={buildImageSources(IMAGES.customCommission, [480, 768, 1200])}
+            fallbackSrc={IMAGE_FALLBACKS.interior}
+            section="homepage-custom-commissions"
+            containerClassName="mt-8 aspect-[5/4] rounded-xl"
+          />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectPill
@@ -836,13 +965,22 @@ function SelectPill({
 function AIWorkSection() {
   return (
     <section className="container-editorial pb-16">
-      <div className="grid gap-6 rounded-2xl border border-[var(--color-border)] bg-[var(--ivory)] p-6 md:grid-cols-[0.8fr_1.2fr] md:p-8">
+      <div className="grid gap-7 rounded-2xl border border-[var(--color-border)] bg-[var(--ivory)] p-6 md:grid-cols-[1.15fr_0.85fr] md:items-center md:p-8">
+        <SafeImage
+          src={IMAGES.aiCreatedWork}
+          alt="Triptych of distinctly digital geometric and generative artwork"
+          width={1200}
+          height={675}
+          sizes="(min-width: 768px) 55vw, 100vw"
+          sources={buildImageSources(IMAGES.aiCreatedWork, [480, 768, 1200])}
+          fallbackSrc={IMAGE_FALLBACKS.gallery}
+          section="homepage-ai-created-work"
+          containerClassName="aspect-video rounded-xl bg-[var(--porcelain)]"
+        />
         <div>
           <div className="eyebrow">AI-created work</div>
           <h2 className="mt-3 font-display text-3xl md:text-4xl">New Tools. New Expressions.</h2>
-        </div>
-        <div>
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
             Explore clearly labelled works created with emerging digital and generative tools.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -915,15 +1053,28 @@ function BusinessSection() {
               Work With ArtDera
             </a>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[Building2, Globe2, HeartHandshake].map((Icon, index) => (
-              <div key={index} className="rounded-xl border border-white/12 bg-white/[0.06] p-5">
-                <Icon className="h-6 w-6" />
-                <div className="mt-10 text-sm text-white/72">
-                  {["Hospitality sourcing", "International projects", "Corporate gifting"][index]}
+          <div>
+            <SafeImage
+              src={IMAGES.businessHospitality}
+              alt="Curated original artwork installed in a refined hotel lounge"
+              width={1600}
+              height={1000}
+              sizes="(min-width: 1024px) 48vw, 100vw"
+              sources={buildImageSources(IMAGES.businessHospitality, [480, 768, 1200, 1600])}
+              fallbackSrc={IMAGE_FALLBACKS.interior}
+              section="homepage-business-services"
+              containerClassName="aspect-[16/10] rounded-xl"
+            />
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[Building2, Globe2, HeartHandshake].map((Icon, index) => (
+                <div key={index} className="rounded-lg border border-white/12 bg-white/[0.06] p-3">
+                  <Icon className="h-5 w-5" />
+                  <div className="mt-3 text-xs text-white/72">
+                    {["Hospitality sourcing", "International projects", "Corporate gifting"][index]}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -941,6 +1092,17 @@ function BuyerProtectionSection() {
           <a href="/buyer-protection" className="btn-ghost mt-6">
             How ArtDera Protects You
           </a>
+          <SafeImage
+            src={IMAGES.categoryPrints}
+            alt="Framed fine-art editions displayed in a carefully styled interior"
+            width={768}
+            height={960}
+            sizes="(min-width: 1024px) 28vw, 100vw"
+            sources={buildImageSources(IMAGES.categoryPrints, [480, 768])}
+            fallbackSrc={IMAGE_FALLBACKS.interior}
+            section="homepage-buyer-protection"
+            containerClassName="mt-7 aspect-[4/3] rounded-xl"
+          />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {[
@@ -964,11 +1126,17 @@ function SellerInvitation() {
   return (
     <section className="container-editorial pb-16">
       <div className="relative overflow-hidden rounded-2xl bg-[var(--ink)] text-white">
-        <img
+        <SafeImage
           src={IMAGES.creator1}
           alt="Artist working in studio"
-          className="absolute inset-0 h-full w-full object-cover opacity-35"
-          loading="lazy"
+          width={720}
+          height={900}
+          sizes="100vw"
+          sources={buildImageSources(IMAGES.creator1, [320, 480, 720])}
+          fallbackSrc={IMAGE_FALLBACKS.artist}
+          section="homepage-sell-on-artdera"
+          containerClassName="absolute inset-0 h-full w-full"
+          className="opacity-35"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/86 via-black/54 to-black/10" />
         <div className="relative max-w-2xl p-7 md:p-12">
@@ -994,13 +1162,27 @@ function SellerInvitation() {
 
 function JournalSection() {
   const articles = [
-    ["Choosing your first original", "Scale, budget and how to trust your eye.", IMAGES.art1],
-    [
-      "Framing calligraphy well",
-      "Materials, mounts and the small choices that let a work breathe.",
-      IMAGES.art2,
-    ],
-    ["Living with photography", "Where fine-art prints belong, and how to hang them.", IMAGES.art3],
+    {
+      category: "Collecting",
+      title: "Choosing your first original",
+      text: "Scale, budget and how to trust your eye.",
+      image: IMAGES.art1,
+      alt: "Minimal original painting with a single vermilion gesture",
+    },
+    {
+      category: "Framing",
+      title: "Framing calligraphy well",
+      text: "Materials, mounts and the small choices that let a work breathe.",
+      image: IMAGES.art2,
+      alt: "Contemporary black calligraphy on warm handmade paper",
+    },
+    {
+      category: "Photography",
+      title: "Living with photography",
+      text: "Where fine-art prints belong, and how to hang them.",
+      image: IMAGES.art3,
+      alt: "Mountain landscape photograph in blue-hour light",
+    },
   ];
 
   return (
@@ -1010,21 +1192,33 @@ function JournalSection() {
         title="Stories for meaningful spaces"
         cta={["Read the journal", "/journal"]}
       />
-      <div className="mt-10 grid gap-5 md:grid-cols-[1.2fr_0.8fr_0.8fr]">
-        {articles.map(([title, text, image], index) => (
-          <a key={title as string} href="/journal" className="group block">
-            <div
-              className={`overflow-hidden rounded-xl ${index === 0 ? "aspect-[16/10]" : "aspect-[4/3]"}`}
-            >
-              <img
-                src={image as string}
-                alt=""
-                className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.035]"
-                loading="lazy"
-              />
+      <div className="mt-10 grid gap-5 md:grid-cols-3">
+        {articles.map((article) => (
+          <a
+            key={article.title}
+            href="/journal"
+            className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--oxblood)]"
+          >
+            <SafeImage
+              src={article.image}
+              alt={article.alt}
+              width={720}
+              height={432}
+              sizes="(min-width: 1024px) 33vw, 100vw"
+              sources={buildImageSources(article.image, [320, 480, 720])}
+              fallbackSrc={IMAGE_FALLBACKS.journal}
+              section="homepage-journal"
+              containerClassName="aspect-[5/3] rounded-xl"
+              className="transition duration-700 group-hover:scale-[1.035]"
+            />
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--oxblood)]">
+              {article.category}
             </div>
-            <div className="mt-4 font-display text-2xl">{title}</div>
-            <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+            <div className="mt-2 font-display text-2xl">{article.title}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{article.text}</p>
+            <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold">
+              Read article <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+            </span>
           </a>
         ))}
       </div>
@@ -1050,10 +1244,13 @@ function NewsletterSection() {
               event.preventDefault();
               const form = event.currentTarget;
               const email = String(new FormData(form).get("email") ?? "");
-              const result = await NewsletterService.subscribe(email, "homepage");
-              if (result.error) return toast.error(result.error.message);
-              form.reset();
-              toast.success("Newsletter preference saved");
+              try {
+                await subscribeToNewsletter(email);
+                form.reset();
+                toast.success("Newsletter preference saved");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Please try again");
+              }
             })()
           }
         >

@@ -20,6 +20,7 @@ import { operationsRouter } from "./routes/operations";
 import { galleryRouter } from "./routes/gallery";
 import { adminRouter } from "./routes/admin";
 import { bootstrapRouter } from "./routes/bootstrap";
+import { homepageRouter } from "./routes/homepage";
 import mongoose from "mongoose";
 
 export function createApp() {
@@ -124,6 +125,7 @@ export function createApp() {
     ok(res, { status: mongoose.connection.readyState === 1 ? "ready" : "starting" }),
   );
   app.use("/api/auth", authLimit, authRouter);
+  app.use("/api/homepage", homepageRouter);
   app.use("/api/plans", plansRouter);
   app.use("/api/subscriptions/payment", paymentLimit);
   app.use("/api/subscriptions", subscriptionsRouter);
