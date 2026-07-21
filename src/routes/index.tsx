@@ -120,7 +120,7 @@ function Home() {
   const collector = PRODUCTS.find((p) => p.kind === "Original") ?? PRODUCTS[0];
 
   return (
-    <div>
+    <div className="home-page">
       <CinematicHero />
       {/* <ArtDeraScrollStory product={storyProduct} /> */}
       <TrustStrip />

@@ -4,6 +4,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+  font-family: "DM Serif Display";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/dmserifdisplay/v17/-nFnOHM81r4j6k0gjAW3mujVU2B2G_Bx0g.woff2")
+    format("woff2");
+}
+
+@font-face {
+  font-family: "DM Serif Display";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/dmserifdisplay/v17/-nFhOHM81r4j6k0gjAW3mujVU2B2G_VB0PD2.woff2")
+    format("woff2");
+}
+
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggexSg.woff2") format("woff2");
+}
+
 /*
  * ArtDera Design System
  * -----------------------------------------------------------
@@ -329,7 +355,8 @@
 
 @layer components {
   .hero-reveal {
-    animation: editorialReveal 0.9s var(--ease-premium) both;
+    opacity: 1;
+    transform: none;
   }
 
   .hero-reveal-delay-1 {
@@ -343,6 +370,11 @@
   }
   .hero-reveal-delay-4 {
     animation-delay: 0.62s;
+  }
+
+  .home-page > section:nth-of-type(n + 3) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 900px;
   }
 
   .image-mask {
