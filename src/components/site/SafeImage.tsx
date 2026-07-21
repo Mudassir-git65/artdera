@@ -121,8 +121,6 @@ export function SafeImage({
           {...props}
           src={currentSrc}
           alt={alt}
-          data-fallback-src={fallbackSrc}
-          data-image-section={section}
           width={width}
           height={height}
           sizes={sizes}

@@ -50,7 +50,7 @@ homepageRouter.get(
         colours: artwork.colours ?? [],
         room: [],
         description: artwork.description ?? "",
-        images: artwork.images.slice(0, 1).map((image: { url: string }) => image.url),
+        images: artwork.images.slice(0, 1).map((image) => image.url),
         featured: Boolean(artwork.isSponsored),
         new: true,
       };

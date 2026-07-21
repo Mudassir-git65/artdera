@@ -27,9 +27,6 @@ export function refreshHomepageCatalog() {
       if (!body.success || !body.data || body.data.products.length < 4) return false;
       const products = body.data.products.slice(0, 8).map((product, index) => ({
         ...product,
-        room: product.room.length
-          ? product.room
-          : ["Living room", "Bedroom", "Office", "Dining room", "Restaurant", "Hotel"],
         images: [normalizeEditorialImage(product.images[0], index)],
       }));
       const creators = body.data.creators.map((creator, index) => ({
@@ -51,12 +48,12 @@ export function refreshHomepageCatalog() {
   return homepagePromise;
 }
 
-export function subscribeToNewsletter(email: string, source = "homepage") {
+export function subscribeToNewsletter(email: string) {
   return fetch("/api/newsletter", {
     method: "POST",
     credentials: "include",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, source }),
+    body: JSON.stringify({ email, source: "homepage" }),
   }).then(async (response) => {
     const body = (await response.json()) as {
       success?: boolean;

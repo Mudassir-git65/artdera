@@ -1,6 +1,7 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
-  createRootRoute,
+  createRootRouteWithContext,
   useRouter,
   useRouterState,
   HeadContent,
@@ -15,10 +16,6 @@ import { Header } from "@/components/site/Header";
 import { Footer } from "@/components/site/Footer";
 import { AuthProvider } from "@/marketplace/auth";
 import { Toaster } from "@/components/ui/sonner";
-
-const safeImageFallbackScript = `document.addEventListener("error",function(event){var image=event.target;if(!(image instanceof HTMLImageElement))return;var fallback=image.dataset.fallbackSrc;if(!fallback||image.dataset.fallbackApplied==="true")return;image.dataset.fallbackApplied="true";var picture=image.parentElement;if(picture&&picture.tagName==="PICTURE")picture.querySelectorAll("source").forEach(function(source){source.remove()});image.removeAttribute("srcset");image.src=fallback},true);`;
-const deferredStylesScript = `var styles=document.getElementById("artdera-styles");if(styles){styles.addEventListener("load",function(){styles.media="all"});if(styles.sheet)styles.media="all"}`;
-const criticalCss = `:root{--ink:#171717;--ivory:#f6f1e8;--porcelain:#fffdfc;--oxblood:#6e2334;--header-height:6.5rem}*{box-sizing:border-box}html{-webkit-font-smoothing:antialiased}body{margin:0;background:var(--ivory);color:var(--ink);font-family:ui-sans-serif,system-ui,sans-serif}a{color:inherit;text-decoration:none}header{position:fixed;inset:0 0 auto;z-index:50;height:var(--header-height);color:var(--ivory)}header>div{width:100%;max-width:86rem;margin:auto;padding:1.25rem}.home-page>section:first-of-type{position:relative;min-height:100svh;overflow:hidden;background:var(--ink);color:#fff}.home-page>section:first-of-type>span{position:absolute;inset:0;display:block;width:100%;height:100%;overflow:hidden}.home-page>section:first-of-type picture{display:contents}.home-page>section:first-of-type img{width:100%;height:100%;object-fit:cover;object-position:center}.home-page>section:first-of-type>div:nth-of-type(1){position:absolute;inset:0;background:linear-gradient(90deg,rgba(23,23,23,.82),rgba(23,23,23,.2)),linear-gradient(0deg,rgba(23,23,23,.78),transparent 55%)}.home-page>section:first-of-type>div:nth-of-type(2){position:relative;z-index:1;display:flex;min-height:100svh;align-items:flex-end}.home-page>section:first-of-type>div:nth-of-type(2)>div{width:100%;max-width:86rem;margin:auto;padding:9rem 1.25rem 6rem}.home-page h1{max-width:48rem;margin:1.25rem 0 0;font-family:Georgia,ui-serif,serif;font-size:clamp(3.3rem,8vw,7.7rem);font-weight:400;line-height:.92}.hero-reveal{display:block;opacity:1;transform:none}.home-page>section:first-of-type p{max-width:36rem;margin:1.75rem 0 0;line-height:1.65;color:rgba(255,255,255,.78)}.home-page>section:first-of-type a{display:inline-flex;min-height:2.75rem;align-items:center;margin-top:1.5rem;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:.7rem 1.25rem;font-size:.875rem;font-weight:700}.home-page>section:first-of-type a:first-child{border-color:var(--oxblood);background:var(--oxblood);color:#fff}@media(min-width:768px){header>div,.home-page>section:first-of-type>div:nth-of-type(2)>div{padding-left:2rem;padding-right:2rem}}`;
 
 function NotFoundComponent() {
   return (
@@ -70,7 +67,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -110,8 +107,14 @@ export const Route = createRootRoute({
       },
     ],
     links: [
+      { rel: "stylesheet", href: appCss },
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -125,14 +128,6 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
-        <style dangerouslySetInnerHTML={{ __html: criticalCss }} />
-        <link rel="preload" href={appCss} as="style" />
-        <link id="artdera-styles" rel="stylesheet" href={appCss} media="print" />
-        <script dangerouslySetInnerHTML={{ __html: deferredStylesScript }} />
-        <noscript>
-          <link rel="stylesheet" href={appCss} />
-        </noscript>
-        <script dangerouslySetInnerHTML={{ __html: safeImageFallbackScript }} />
       </head>
       <body>
         {children}
@@ -144,6 +139,7 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const isHome = pathname === "/";
   const privateWorkspace =
@@ -160,15 +156,17 @@ function RootComponent() {
       "/artist/store-created",
     ].includes(pathname);
   return (
-    <AuthProvider>
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <main className={`flex-1 ${isHome ? "" : "pt-[var(--header-height)]"}`}>
-          <Outlet />
-        </main>
-        {!privateWorkspace && <Footer />}
-      </div>
-      <Toaster position="top-right" richColors />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className={`flex-1 ${isHome ? "" : "pt-[var(--header-height)]"}`}>
+            <Outlet />
+          </main>
+          {!privateWorkspace && <Footer />}
+        </div>
+        <Toaster position="top-right" richColors />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }

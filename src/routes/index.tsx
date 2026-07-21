@@ -45,15 +45,6 @@ const WALL_QUIZ_OPTIONS = {
   budget: Object.keys(WALL_QUIZ_BUDGET_MAX),
 } as const;
 
-const MOOD_COLOURS: Record<string, string[]> = {
-  Calm: ["ivory", "indigo", "stone"],
-  Bold: ["oxblood", "terracotta", "indigo"],
-  Minimal: ["ink", "ivory", "stone"],
-  Cultural: ["terracotta", "oxblood", "indigo"],
-  Luxurious: ["oxblood", "ink", "stone"],
-  Expressive: ["terracotta", "indigo", "oxblood"],
-};
-
 const HERO_SOURCES: SafeImageSource[] = [
   {
     type: "image/avif",
@@ -115,12 +106,11 @@ function Home() {
   const editPicks = COLLECTIONS[0].products
     .map((s) => PRODUCTS.find((p) => p.slug === s)!)
     .filter(Boolean);
-  const affordablePicks = PRODUCTS.filter((p) => p.price < 50000);
-  const affordable = affordablePicks.length ? affordablePicks : PRODUCTS.slice(0, 6);
+  const affordable = PRODUCTS.filter((p) => p.price < 50000);
   const collector = PRODUCTS.find((p) => p.kind === "Original") ?? PRODUCTS[0];
 
   return (
-    <div className="home-page">
+    <div>
       <CinematicHero />
       {/* <ArtDeraScrollStory product={storyProduct} /> */}
       <TrustStrip />
@@ -272,11 +262,7 @@ function CategoryMosaic() {
               sizes="(min-width: 1280px) 24vw, (min-width: 768px) 33vw, (min-width: 380px) 50vw, 100vw"
               sources={buildImageSources(
                 category.image,
-                category.slug === "custom-commissions"
-                  ? [480, 768, 1200]
-                  : category.image.includes("/categories/")
-                    ? [480, 768]
-                    : [320, 480, 720],
+                category.image.includes("/categories/") ? [480, 768] : [320, 480, 720],
               )}
               fallbackSrc={IMAGE_FALLBACKS.gallery}
               section={`homepage-category-${category.slug}`}
@@ -392,40 +378,18 @@ function CurateWallQuiz() {
 
   const recommendation = useMemo(() => {
     const max = WALL_QUIZ_BUDGET_MAX[answers.budget] ?? 300000;
-    const eligible = PRODUCTS.filter((product) => product.price <= max);
-    const pool = eligible.length ? eligible : PRODUCTS;
-    const selectedSize = answers.size;
-    const moodColours = MOOD_COLOURS[answers.mood] ?? [];
-    const answerSeed = Object.values(answers)
-      .join("|")
-      .split("")
-      .reduce((total, character) => total + character.charCodeAt(0), 0);
-    return [...pool].sort((left, right) => {
-      const score = (product: (typeof PRODUCTS)[number]) => {
-        const roomMatch = product.room.some((room) =>
-          room.toLowerCase().includes(answers.room.toLowerCase().split(" ")[0]),
-        );
-        const longestSide = Math.max(
-          ...(product.dimensions.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [0]),
-        );
-        const sizeMatch =
-          (selectedSize === "Small" && longestSide <= 50) ||
-          (selectedSize === "Medium" && longestSide > 50 && longestSide <= 80) ||
-          (selectedSize === "Large" && longestSide > 80 && longestSide <= 110) ||
-          (selectedSize === "Statement" && longestSide > 110);
-        return (
-          (roomMatch ? 4 : 0) +
-          (product.colours.includes(answers.colour) ? 5 : 0) +
-          (product.colours.some((colour) => moodColours.includes(colour)) ? 2 : 0) +
-          (sizeMatch ? 3 : 0)
-        );
-      };
-      const scoreDifference = score(right) - score(left);
-      if (scoreDifference) return scoreDifference;
-      const leftTieBreak = (answerSeed + left.slug.length * 17) % 97;
-      const rightTieBreak = (answerSeed + right.slug.length * 17) % 97;
-      return rightTieBreak - leftTieBreak;
-    })[0];
+    return (
+      PRODUCTS.find(
+        (product) =>
+          product.price <= max &&
+          product.room.some((room) =>
+            room.toLowerCase().includes(answers.room.toLowerCase().split(" ")[0]),
+          ) &&
+          product.colours.includes(answers.colour),
+      ) ??
+      PRODUCTS.find((product) => product.price <= max) ??
+      PRODUCTS[0]
+    );
   }, [answers]);
 
   const params = new URLSearchParams({
@@ -547,25 +511,24 @@ function QuizGroup({
 }
 
 function ShopThisSpace() {
-  const preferredProducts = ["quiet-horizon", "silence-in-script", "pomegranate-study"]
+  const hotProducts = ["quiet-horizon", "silence-in-script", "pomegranate-study"]
     .map((slug) => getProduct(slug))
     .filter(Boolean) as typeof PRODUCTS;
-  const hotProducts = preferredProducts.length === 3 ? preferredProducts : PRODUCTS.slice(0, 3);
   const [activeSlug, setActiveSlug] = useState(hotProducts[0]?.slug);
   const active = hotProducts.find((product) => product.slug === activeSlug) ?? hotProducts[0];
   const positions = [
-    { slug: hotProducts[0]?.slug, x: "48%", y: "34%" },
-    { slug: hotProducts[1]?.slug, x: "25%", y: "43%" },
-    { slug: hotProducts[2]?.slug, x: "71%", y: "58%" },
-  ].filter((spot): spot is { slug: string; x: string; y: string } => Boolean(spot.slug));
+    { slug: "quiet-horizon", x: "48%", y: "34%" },
+    { slug: "silence-in-script", x: "25%", y: "43%" },
+    { slug: "pomegranate-study", x: "71%", y: "58%" },
+  ];
 
   if (!active) return null;
 
   return (
     <section id="shop-this-space" className="bg-[var(--ink)] text-[var(--ivory)]">
       <div className="container-editorial section-y">
-        <div className="grid min-w-0 gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div className="min-w-0">
+        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+          <div>
             <div className="eyebrow text-white/55">Interior discovery</div>
             <h2 className="mt-3 font-display text-4xl md:text-5xl">Shop This Space</h2>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-white/68">
@@ -599,7 +562,7 @@ function ShopThisSpace() {
               ))}
             </div>
           </div>
-          <div className="min-w-0 rounded-2xl border border-white/12 bg-white/[0.06] p-5">
+          <div className="rounded-2xl border border-white/12 bg-white/[0.06] p-5">
             <SafeImage
               src={active.images[0]}
               alt={active.title}
@@ -646,13 +609,7 @@ function ShopThisSpace() {
 
 function CreatorSpotlight() {
   const creator = CREATORS[0];
-  const creatorWorks = creator.works
-    .map((slug) => getProduct(slug))
-    .filter(Boolean) as typeof PRODUCTS;
-  const works = [
-    ...creatorWorks,
-    ...PRODUCTS.filter((product) => !creatorWorks.some((work) => work.slug === product.slug)),
-  ].slice(0, 3);
+  const works = creator.works.map((slug) => getProduct(slug)).filter(Boolean) as typeof PRODUCTS;
 
   return (
     <section className="container-editorial section-y">
@@ -1244,13 +1201,10 @@ function NewsletterSection() {
               event.preventDefault();
               const form = event.currentTarget;
               const email = String(new FormData(form).get("email") ?? "");
-              try {
-                await subscribeToNewsletter(email);
-                form.reset();
-                toast.success("Newsletter preference saved");
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Please try again");
-              }
+              const result = await NewsletterService.subscribe(email, "homepage");
+              if (result.error) return toast.error(result.error.message);
+              form.reset();
+              toast.success("Newsletter preference saved");
             })()
           }
         >
