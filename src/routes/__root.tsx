@@ -6,22 +6,15 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { Header } from "@/components/site/Header";
+import { Footer } from "@/components/site/Footer";
 import { AuthProvider } from "@/marketplace/auth";
-
-const Header = lazy(() =>
-  import("@/components/site/Header").then((module) => ({ default: module.Header })),
-);
-const Footer = lazy(() =>
-  import("@/components/site/Footer").then((module) => ({ default: module.Footer })),
-);
-const Toaster = lazy(() =>
-  import("@/components/ui/sonner").then((module) => ({ default: module.Toaster })),
-);
+import { Toaster } from "@/components/ui/sonner";
 
 const safeImageFallbackScript = `document.addEventListener("error",function(event){var image=event.target;if(!(image instanceof HTMLImageElement))return;var fallback=image.dataset.fallbackSrc;if(!fallback||image.dataset.fallbackApplied==="true")return;image.dataset.fallbackApplied="true";var picture=image.parentElement;if(picture&&picture.tagName==="PICTURE")picture.querySelectorAll("source").forEach(function(source){source.remove()});image.removeAttribute("srcset");image.src=fallback},true);`;
 
@@ -161,49 +154,13 @@ function RootComponent() {
   return (
     <AuthProvider>
       <div className="min-h-screen flex flex-col">
-        <Suspense fallback={<HeaderFallback />}>
-          <Header />
-        </Suspense>
+        <Header />
         <main className={`flex-1 ${isHome ? "" : "pt-[var(--header-height)]"}`}>
           <Outlet />
         </main>
-        {!privateWorkspace && (
-          <Suspense fallback={null}>
-            <Footer />
-          </Suspense>
-        )}
+        {!privateWorkspace && <Footer />}
       </div>
-      <IdleToaster />
-    </AuthProvider>
-  );
-}
-
-function HeaderFallback() {
-  return (
-    <header className="fixed inset-x-0 top-0 z-50 flex h-[var(--header-height)] items-center border-b border-white/10 bg-[var(--ink)] px-5 text-[var(--ivory)]">
-      <a href="/" className="font-display text-2xl" aria-label="ArtDera home">
-        ArtDera
-      </a>
-    </header>
-  );
-}
-
-function IdleToaster() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const schedule =
-      window.requestIdleCallback ??
-      ((callback: IdleRequestCallback) => window.setTimeout(callback, 1500));
-    const cancel = window.cancelIdleCallback ?? window.clearTimeout;
-    const handle = schedule(() => setReady(true), { timeout: 2500 });
-    return () => cancel(handle);
-  }, []);
-
-  if (!ready) return null;
-  return (
-    <Suspense fallback={null}>
       <Toaster position="top-right" richColors />
-    </Suspense>
+    </AuthProvider>
   );
 }
